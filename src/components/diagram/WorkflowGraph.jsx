@@ -19,13 +19,13 @@ const initialNodes = [
   {
     id: "start",
     position: { x: 0, y: 0 },
-    data: { label: "START" },
+    data: { label: "START", taskType: "SIMPLE" },
     type: "task",
   },
   {
     id: "switch",
     position: { x: 0, y: 150 },
-    data: { label: "SWITCH" },
+    data: { label: "SWITCH", taskType: "SWITCH" },
     type: "switch",
   },
 ];
@@ -114,13 +114,14 @@ export default function WorkflowGraph() {
   }, [edges.length, nodes.length]);
 
   const addNode = useCallback(
-    (parentId, type, caseName = null) => {
+    (parentId, { label, type: taskType }, caseName = null) => {
       const id = `n${Date.now()}`;
+      const nodeType = taskType.toLowerCase() === "switch" ? "switch" : "task";
       const newNode = {
         id,
-        type: type.toLowerCase() === "switch" ? "switch" : "task",
+        type: nodeType,
         position: { x: 0, y: 0 },
-        data: { label: type, type },
+        data: { label, taskType },
       };
       setNodes((nds) => nds.concat(newNode));
       setEdges((eds) =>
@@ -152,19 +153,19 @@ export default function WorkflowGraph() {
   const closeEdit = useCallback(() => setEditTarget(null), []);
 
   const handleAdd = useCallback(
-    (type) => {
+    ({ label, type }) => {
       if (addTarget) {
-        addNode(addTarget.parentId, type, addTarget.caseName);
+        addNode(addTarget.parentId, { label, type }, addTarget.caseName);
       }
     },
     [addTarget, addNode],
   );
 
   const handleSave = useCallback(
-    ({ id, label, type }) => {
+    ({ id, label, taskType }) => {
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, label, type } } : n,
+          n.id === id ? { ...n, data: { ...n.data, label, taskType } } : n,
         ),
       );
     },

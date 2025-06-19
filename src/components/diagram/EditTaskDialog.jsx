@@ -14,17 +14,17 @@ const TYPES = ["SIMPLE", "HTTP", "SWITCH", "SUB_WORKFLOW"];
 
 export default function EditTaskDialog({ open, node, onClose, onSave }) {
   const [label, setLabel] = useState("");
-  const [type, setType] = useState(TYPES[0]);
+  const [taskType, setTaskType] = useState(TYPES[0]);
 
   useEffect(() => {
     if (node) {
       setLabel(node.data.label || "");
-      setType(node.data.type || TYPES[0]);
+      setTaskType(node.data.taskType || TYPES[0]);
     }
   }, [node]);
 
   const handleSave = () => {
-    onSave({ id: node.id, label, type });
+    onSave({ id: node.id, label, taskType });
     onClose();
   };
 
@@ -40,8 +40,8 @@ export default function EditTaskDialog({ open, node, onClose, onSave }) {
           onChange={(e) => setLabel(e.target.value)}
         />
         <Select
-          value={type}
-          onChange={(e) => setType(e.target.value)}
+          value={taskType}
+          onChange={(e) => setTaskType(e.target.value)}
           fullWidth
         >
           {TYPES.map((t) => (
