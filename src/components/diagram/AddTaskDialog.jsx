@@ -7,15 +7,19 @@ import {
   Button,
   MenuItem,
   Select,
+  TextField,
 } from "@material-ui/core";
 
 const TYPES = ["SIMPLE", "HTTP", "SWITCH", "SUB_WORKFLOW"];
 
 export default function AddTaskDialog({ open, onClose, onAdd }) {
   const [type, setType] = useState(TYPES[0]);
+  const [label, setLabel] = useState("");
 
   const handleAdd = () => {
-    onAdd(type);
+    onAdd({ type, label: label || type });
+    setLabel("");
+    setType(TYPES[0]);
     onClose();
   };
 
@@ -23,6 +27,13 @@ export default function AddTaskDialog({ open, onClose, onAdd }) {
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>Select Task Type</DialogTitle>
       <DialogContent>
+        <TextField
+          margin="dense"
+          label="Name"
+          fullWidth
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+        />
         <Select
           value={type}
           onChange={(e) => setType(e.target.value)}

@@ -19,13 +19,13 @@ const initialNodes = [
   {
     id: "start",
     position: { x: 0, y: 0 },
-    data: { label: "START" },
+    data: { label: "START", taskType: "SIMPLE" },
     type: "task",
   },
   {
     id: "switch",
     position: { x: 0, y: 150 },
-    data: { label: "SWITCH" },
+    data: { label: "SWITCH", taskType: "SWITCH" },
     type: "switch",
   },
 ];
@@ -57,10 +57,16 @@ const TaskNode = ({ id, data }) => (
       {data.label}
     </div>
     <div className="space-x-1 mt-1">
-      <button onClick={() => data.onAdd(id)} className="px-1 bg-yellow-200 rounded-full">
+      <button
+        onClick={() => data.onAdd(id)}
+        className="px-1 bg-yellow-200 rounded-full"
+      >
         +
       </button>
-      <button onClick={() => data.onRemove(id)} className="px-1 bg-red-200 rounded-full">
+      <button
+        onClick={() => data.onRemove(id)}
+        className="px-1 bg-red-200 rounded-full"
+      >
         -
       </button>
     </div>
@@ -74,11 +80,20 @@ const SwitchNode = ({ id, data }) => (
     <div onClick={() => data.onEdit(id)} className="cursor-pointer">
       {data.label}
     </div>
-    <div className="space-x-1 mt-1">
-      <button onClick={() => data.onAddBranch(id)} className="px-1 bg-yellow-200 rounded-full">
-        +
-      </button>
-      <button onClick={() => data.onRemoveBranch(id)} className="px-1 bg-red-200 rounded-full">
+    <div className="flex justify-center space-x-1 mt-1">
+      {["case1", "case2", "default"].map((c) => (
+        <button
+          key={c}
+          onClick={() => data.onAddBranch(id, c)}
+          className="px-1 bg-yellow-200 rounded-full"
+        >
+          +{c}
+        </button>
+      ))}
+      <button
+        onClick={() => data.onRemove(id)}
+        className="px-1 bg-red-200 rounded-full"
+      >
         -
       </button>
     </div>
@@ -91,28 +106,61 @@ const nodeTypes = { task: TaskNode, switch: SwitchNode };
 export default function WorkflowGraph() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [addParent, setAddParent] = useState(null);
+  const [addTarget, setAddTarget] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
+
+  // Load stored workflow from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("workflow");
+    if (stored) {
+      try {
+        const { nodes: savedNodes, edges: savedEdges } = JSON.parse(stored);
+        setNodes(savedNodes);
+        setEdges(savedEdges);
+      } catch {
+        // ignore corrupted data
+      }
+    }
+  }, []);
+
+  // Persist workflow whenever it changes
+  useEffect(() => {
+    localStorage.setItem("workflow", JSON.stringify({ nodes, edges }));
+  }, [nodes, edges]);
 
   useEffect(() => {
     setNodes((nds) => layout(nds, edges));
   }, [edges.length, nodes.length]);
 
   const addNode = useCallback(
-    (parentId, type) => {
+    (parentId, { label, type: taskType }, caseName = null) => {
       const id = `n${Date.now()}`;
+      const nodeType = taskType.toLowerCase() === "switch" ? "switch" : "task";
+      let position = { x: 0, y: 0 };
+      const parent = nodes.find((n) => n.id === parentId);
+      if (parent) {
+        position = {
+          x: parent.position.x + 100,
+          y: parent.position.y + 100,
+        };
+      }
       const newNode = {
         id,
-        type: type.toLowerCase() === "switch" ? "switch" : "task",
-        position: { x: 0, y: 0 },
-        data: { label: type, type },
+        type: nodeType,
+        position,
+        data: { label, taskType },
       };
       setNodes((nds) => nds.concat(newNode));
       setEdges((eds) =>
-        eds.concat({ id: `e-${parentId}-${id}`, source: parentId, target: id })
+        eds.concat({
+          id: `e-${parentId}-${id}`,
+          source: parentId,
+          target: id,
+          label: caseName || undefined,
+        }),
       );
     },
-    [setNodes, setEdges]
+    [nodes, setNodes, setEdges],
   );
 
   const removeNode = useCallback(
@@ -123,47 +171,37 @@ export default function WorkflowGraph() {
     [setNodes, setEdges],
   );
 
-  const openAdd = useCallback((id) => setAddParent(id), []);
-  const closeAdd = useCallback(() => setAddParent(null), []);
+  const openAdd = useCallback(
+    (parentId, caseName = null) => setAddTarget({ parentId, caseName }),
+    [],
+  );
+  const closeAdd = useCallback(() => setAddTarget(null), []);
   const openEdit = useCallback((id) => setEditTarget(id), []);
   const closeEdit = useCallback(() => setEditTarget(null), []);
 
   const handleAdd = useCallback(
-    (type) => {
-      if (addParent) {
-        addNode(addParent, type);
+    ({ label, type }) => {
+      if (addTarget) {
+        addNode(addTarget.parentId, { label, type }, addTarget.caseName);
       }
     },
-    [addParent, addNode]
+    [addTarget, addNode],
   );
 
   const handleSave = useCallback(
-    ({ id, label, type }) => {
+    ({ id, label, taskType }) => {
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, label, type } } : n
-        )
+          n.id === id ? { ...n, data: { ...n.data, label, taskType } } : n,
+        ),
       );
     },
-    [setNodes]
+    [setNodes],
   );
 
   const addSwitchBranch = useCallback(
-    (switchId) => openAdd(switchId),
-    [openAdd]
-  );
-
-  const removeSwitchBranch = useCallback(
-    (switchId) => {
-      setEdges((eds) => {
-        const branchEdges = eds.filter((e) => e.source === switchId);
-        if (!branchEdges.length) return eds;
-        const branch = branchEdges[branchEdges.length - 1];
-        setNodes((nds) => nds.filter((n) => n.id !== branch.target));
-        return eds.filter((e) => e.id !== branch.id);
-      });
-    },
-    [setEdges, setNodes],
+    (switchId, caseName) => openAdd(switchId, caseName),
+    [openAdd],
   );
 
   const onConnect = useCallback(
@@ -178,14 +216,19 @@ export default function WorkflowGraph() {
           data: {
             ...n.data,
             onAddBranch: addSwitchBranch,
-            onRemoveBranch: removeSwitchBranch,
+            onRemove: removeNode,
             onEdit: openEdit,
           },
         }
       : {
           ...n,
-          data: { ...n.data, onAdd: openAdd, onRemove: removeNode, onEdit: openEdit },
-        }
+          data: {
+            ...n.data,
+            onAdd: openAdd,
+            onRemove: removeNode,
+            onEdit: openEdit,
+          },
+        },
   );
 
   return (
@@ -206,11 +249,7 @@ export default function WorkflowGraph() {
         <Background />
         <Controls />
       </ReactFlow>
-      <AddTaskDialog
-        open={!!addParent}
-        onClose={closeAdd}
-        onAdd={handleAdd}
-      />
+      <AddTaskDialog open={!!addTarget} onClose={closeAdd} onAdd={handleAdd} />
       <EditTaskDialog
         open={!!editTarget}
         node={nodes.find((n) => n.id === editTarget)}
