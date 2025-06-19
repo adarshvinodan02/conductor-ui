@@ -45,7 +45,8 @@
     "xss": "^1.0.8",
     "yarn": "^1.22.22",
     "yup": "^0.32.11",
-    "recharts": "^2.11.0"
+    "recharts": "^2.11.0",
+    "reactflow": "^11.10.0"
   },
   "scripts": {
     "start": "react-scripts start",
